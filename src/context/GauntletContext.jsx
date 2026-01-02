@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 
 // Define the level order for automatic progression
 const LEVEL_ORDER = [
@@ -16,49 +16,80 @@ export const GauntletProvider = ({ children }) => {
   const [startTime, setStartTime] = useState(null);
   const [levelComplete, setLevelComplete] = useState(false);
 
+  // Read level from URL hash on mount and on hash change
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.slice(1); // Remove #
+      if (hash && LEVEL_ORDER.includes(hash)) {
+        setCurrentLevel(hash);
+        setIsRunning(true);
+        setLevelComplete(false);
+        if (!startTime) {
+          setStartTime(Date.now());
+        }
+        console.log(`[Gauntlet] Level ${hash} loaded from URL.`);
+      }
+    };
+
+    // Initial check
+    handleHashChange();
+    
+    // Listen for hash changes
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, [startTime]);
+
   const startLevel = useCallback((levelId) => {
     setLogs([]);
     setCurrentLevel(levelId);
     setIsRunning(true);
     setStartTime(Date.now());
     setLevelComplete(false);
+    // Update URL
+    window.location.hash = levelId;
     console.log(`[Gauntlet] Level ${levelId} started.`);
   }, []);
 
   const stopLevel = useCallback(() => {
     setIsRunning(false);
+    window.location.hash = '';
     console.log(`[Gauntlet] Level ${currentLevel} stopped.`);
   }, [currentLevel]);
 
-  // Mark current level as complete and auto-advance to next
+  // Mark current level as complete and REDIRECT to next level URL
   const completeLevel = useCallback(() => {
     if (!currentLevel || levelComplete) return;
     
     setLevelComplete(true);
     console.log(`[Gauntlet] Level ${currentLevel} COMPLETED!`);
     
+    // Add completion event to logs
+    setLogs(prev => [...prev, {
+      type: 'level_complete',
+      level: currentLevel,
+      timestamp: Date.now(),
+      relativeTime: Date.now() - startTime
+    }]);
+    
     // Find next level
     const currentIndex = LEVEL_ORDER.indexOf(currentLevel);
     if (currentIndex >= 0 && currentIndex < LEVEL_ORDER.length - 1) {
       const nextLevel = LEVEL_ORDER[currentIndex + 1];
-      console.log(`[Gauntlet] Auto-advancing to ${nextLevel}...`);
+      console.log(`[Gauntlet] Redirecting to ${nextLevel}...`);
       
-      // Short delay to show completion, then advance
+      // DIRECTLY redirect via URL change after short delay
       setTimeout(() => {
-        setLogs([]);
-        setCurrentLevel(nextLevel);
-        setStartTime(Date.now());
-        setLevelComplete(false);
-        console.log(`[Gauntlet] Level ${nextLevel} started.`);
-      }, 1500);
+        window.location.hash = nextLevel;
+      }, 800);
     } else {
       // All levels complete
       console.log(`[Gauntlet] ALL LEVELS COMPLETE! Congratulations!`);
       setTimeout(() => {
+        window.location.hash = 'complete';
         setIsRunning(false);
-      }, 1500);
+      }, 800);
     }
-  }, [currentLevel, levelComplete]);
+  }, [currentLevel, levelComplete, startTime]);
 
   // Start from the beginning
   const startGauntlet = useCallback(() => {
@@ -67,8 +98,15 @@ export const GauntletProvider = ({ children }) => {
   }, [startLevel]);
 
   const addLog = useCallback((event) => {
-    setLogs(prev => [...prev, { ...event, timestamp: Date.now(), relativeTime: Date.now() - startTime }]);
-  }, [startTime]);
+    const logEntry = { 
+      ...event, 
+      timestamp: Date.now(), 
+      relativeTime: startTime ? Date.now() - startTime : 0,
+      level: currentLevel
+    };
+    console.log('[Gauntlet Log]', logEntry);
+    setLogs(prev => [...prev, logEntry]);
+  }, [startTime, currentLevel]);
 
   // Get current progress
   const getCurrentProgress = useCallback(() => {

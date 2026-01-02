@@ -3,20 +3,13 @@ import { useGauntlet } from '../context/GauntletContext';
 import { useObserver } from '../hooks/useObserver';
 
 export const Gauntlet = ({ children }) => {
-  useObserver(); // Activate spyware
+  useObserver(); // Activate event logging
   const { logs, isRunning, startGauntlet, stopLevel, currentLevel, levelComplete, getCurrentProgress, LEVEL_ORDER } = useGauntlet();
   
   const progress = getCurrentProgress();
+  const isComplete = window.location.hash === '#complete';
 
-  // Auto-start support via URL parameter: ?autostart=true
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const autostart = params.get('autostart');
-    if (autostart === 'true' && !isRunning && !currentLevel) {
-      startGauntlet();
-    }
-  }, [startGauntlet, isRunning, currentLevel]);
-
+  // Download report automatically
   const downloadReport = () => {
     if (logs.length === 0) return;
     
@@ -29,7 +22,6 @@ export const Gauntlet = ({ children }) => {
         sessionId: new Date(startTime).toISOString(),
         durationMs: endTime - startTime,
         totalEvents: logs.length,
-        score: "PENDING ASSESSOR",
         logs: logs
     };
     
@@ -50,78 +42,19 @@ export const Gauntlet = ({ children }) => {
 
   return (
     <div style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden' }}>
-      {/* The Arena */}
+      {/* ========== MAIN CHALLENGE AREA ========== */}
+      {/* This is the ONLY area the AI should interact with */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          <header data-gauntlet-ui="true" style={{ padding: '15px', background: '#222', color: '#fff', borderBottom: '1px solid #444', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h1 style={{ margin: 0, fontSize: '1.2rem' }}>Silicon Gauntlet <span style={{fontSize: '0.8em', color: '#666'}}>v0.2</span></h1>
-            
-            <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
-                {/* Progress indicator */}
-                {isRunning && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div style={{ 
-                      background: '#333', 
-                      padding: '5px 12px', 
-                      borderRadius: '4px',
-                      fontFamily: 'monospace',
-                      fontSize: '0.9rem'
-                    }}>
-                      <span style={{ color: '#4CAF50' }}>{getLevelDisplayName(currentLevel)}</span>
-                      <span style={{ color: '#666', marginLeft: '10px' }}>
-                        ({progress.current}/{progress.total})
-                      </span>
-                    </div>
-                    
-                    {/* Progress bar */}
-                    <div style={{ 
-                      width: '100px', 
-                      height: '6px', 
-                      background: '#444', 
-                      borderRadius: '3px',
-                      overflow: 'hidden'
-                    }}>
-                      <div style={{ 
-                        width: `${(progress.current / progress.total) * 100}%`, 
-                        height: '100%', 
-                        background: 'linear-gradient(90deg, #4CAF50, #8BC34A)',
-                        transition: 'width 0.3s ease'
-                      }} />
-                    </div>
-                  </div>
-                )}
-
-                {!isRunning ? (
-                    <>
-                        <button 
-                            onClick={startGauntlet}
-                            style={{ background: '#4CAF50', color: 'white', border: 'none', padding: '8px 16px', borderRadius: 4, cursor: 'pointer', fontWeight: 'bold' }}
-                        >
-                            START GAUNTLET
-                        </button>
-                        {logs.length > 0 && (
-                            <button 
-                                onClick={downloadReport}
-                                style={{ background: '#2196F3', color: 'white', border: 'none', padding: '8px 16px', borderRadius: 4, cursor: 'pointer', fontWeight: 'bold' }}
-                            >
-                                DOWNLOAD REPORT
-                            </button>
-                        )}
-                    </>
-                ) : (
-                    <button 
-                        onClick={() => {
-                          stopLevel();
-                          downloadReport();
-                        }}
-                        style={{ background: '#F44336', color: 'white', border: 'none', padding: '8px 16px', borderRadius: 4, cursor: 'pointer', fontWeight: 'bold', animation: 'pulse 2s infinite' }}
-                    >
-                        STOP & DOWNLOAD
-                    </button>
-                )}
-            </div>
-          </header>
-
-         <div id="scenario-root" style={{ flex: 1, padding: 40, background: '#f5f5f5', overflowY: 'auto', position: 'relative' }}>
+         <div 
+           id="challenge-area" 
+           style={{ 
+             flex: 1, 
+             padding: 40, 
+             background: '#f5f5f5', 
+             overflowY: 'auto', 
+             position: 'relative' 
+           }}
+         >
             {/* Level Complete Overlay */}
             {levelComplete && (
                 <div style={{ 
@@ -138,64 +71,203 @@ export const Gauntlet = ({ children }) => {
                     <div style={{ textAlign: 'center' }}>
                         <h2 style={{ fontSize: '3rem', margin: 0 }}>✓ LEVEL COMPLETE</h2>
                         <p style={{ fontSize: '1.2rem', opacity: 0.9 }}>
-                          {progress.current < progress.total 
-                            ? 'Loading next challenge...' 
-                            : '🎉 ALL LEVELS COMPLETE! 🎉'}
+                          Redirecting to next level...
+                        </p>
+                    </div>
+                </div>
+            )}
+
+            {/* All Levels Complete */}
+            {isComplete && (
+                <div style={{ 
+                  position: 'absolute', 
+                  top: 0, left: 0, right: 0, bottom: 0, 
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
+                  display: 'flex', 
+                  justifyContent: 'center', 
+                  alignItems: 'center', 
+                  color: 'white', 
+                  zIndex: 20
+                }}>
+                    <div style={{ textAlign: 'center' }}>
+                        <h2 style={{ fontSize: '3rem', margin: 0 }}>🎉 ALL LEVELS COMPLETE! 🎉</h2>
+                        <p style={{ fontSize: '1.5rem', marginTop: 20 }}>
+                          Congratulations! You've mastered all 19 challenges.
                         </p>
                     </div>
                 </div>
             )}
             
-            {/* Waiting Overlay */}
-            {!isRunning && !levelComplete && (
-                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'white', zIndex: 10 }}>
-                    <div style={{ textAlign: 'center' }}>
-                        <h2>Ready Agent One?</h2>
-                        {logs.length > 0 ? (
-                             <p>Scenario complete. Download your report or start again.</p>
-                        ) : (
-                             <p>Press START GAUNTLET to begin the challenge.<br/>
-                             <span style={{fontSize: '0.9em', color: '#888'}}>
-                               {LEVEL_ORDER.length} levels await. No manual level selection—just survive.
-                             </span>
-                             </p>
-                        )}
+            {/* Waiting state - no level selected */}
+            {!isRunning && !isComplete && !currentLevel && (
+                <div style={{ 
+                  display: 'flex', 
+                  height: '100%', 
+                  justifyContent: 'center', 
+                  alignItems: 'center' 
+                }}>
+                    <div style={{ textAlign: 'center', maxWidth: 500 }}>
+                        <h2 style={{ color: '#333' }}>AI Browser Automation Test</h2>
+                        <p style={{ color: '#666', marginBottom: 30 }}>
+                          This test contains {LEVEL_ORDER.length} challenges to evaluate browser automation capabilities.
+                        </p>
+                        <p style={{ color: '#888', fontSize: '14px' }}>
+                          To start: Navigate to <code style={{ background: '#eee', padding: '2px 6px', borderRadius: 3 }}>#level-1-1</code> in the URL
+                        </p>
+                        <p style={{ color: '#888', fontSize: '14px', marginTop: 10 }}>
+                          Example: <code style={{ background: '#eee', padding: '2px 6px', borderRadius: 3 }}>http://localhost:5174/#level-1-1</code>
+                        </p>
                     </div>
                 </div>
             )}
             
-            {/* This is where the specific scenario component will render */}
+            {/* Challenge content renders here */}
             {children}
          </div>
       </div>
 
-      {/* The Terminal */}
-      <div data-gauntlet-ui="true" style={{ width: '350px', background: '#1e1e1e', color: '#0f0', display: 'flex', flexDirection: 'column', borderLeft: '1px solid #333' }}>
-        <div style={{ padding: '10px', background: '#333', color: '#fff', fontWeight: 'bold', fontSize: '0.9rem' }}>
-            TERMINAL // LOGS
+      {/* ========== MONITORING PANEL ========== */}
+      {/* This panel is for HUMAN observation only. AI should NOT interact with this. */}
+      {/* All elements marked with data-gauntlet-ui="true" and aria-hidden="true" */}
+      <div 
+        data-gauntlet-ui="true" 
+        aria-hidden="true"
+        style={{ 
+          width: '320px', 
+          background: '#1a1a1a', 
+          color: '#0f0', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          borderLeft: '3px solid #333',
+          userSelect: 'none',
+          pointerEvents: 'none' // Prevent any interaction
+        }}
+      >
+        {/* Header */}
+        <div style={{ 
+          padding: '12px 15px', 
+          background: '#000', 
+          borderBottom: '2px solid #333',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <div>
+            <span style={{ color: '#666', fontSize: '10px', letterSpacing: '2px' }}>MONITORING PANEL</span>
+            <h1 style={{ margin: '5px 0 0', fontSize: '1rem', color: '#fff' }}>
+              Silicon Gauntlet <span style={{ color: '#666', fontSize: '0.8em' }}>v0.3</span>
+            </h1>
+          </div>
+          {isRunning && (
+            <div style={{ 
+              background: '#4CAF50', 
+              color: 'white', 
+              padding: '4px 10px', 
+              borderRadius: 4,
+              fontSize: '11px',
+              fontWeight: 'bold',
+              animation: 'pulse 2s infinite'
+            }}>
+              ● REC
+            </div>
+          )}
         </div>
-        <div style={{ flex: 1, padding: '10px', overflowY: 'auto', fontFamily: 'monospace', fontSize: '12px' }}>
-            {logs.length === 0 && <div style={{ color: '#666' }}>Waiting for signals...</div>}
-            {logs.map((log, i) => (
-                <div key={i} style={{ marginBottom: 6, borderBottom: '1px solid #333', paddingBottom: 4 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#888' }}>
-                        <span>{log.type.toUpperCase()}</span>
-                        <span>+{log.relativeTime}ms</span>
-                    </div>
-                    <div style={{ color: '#eee' }}>
-                        &lt;{log.targetTag.toLowerCase()} 
-                        {log.targetId ? <span style={{ color: '#4fc3f7' }}>#{log.targetId}</span> : ''}
-                        {log.targetClass ? <span style={{ color: '#a5d6a7' }}>.{log.targetClass.split(' ').join('.')}</span> : ''}
-                        &gt;
-                    </div>
-                    {log.value !== undefined && <div style={{ color: '#ffb74d' }}>val: "{log.value}"</div>}
-                    {log.innerText && <div style={{ color: '#ba68c8' }}>text: "{log.innerText}"</div>}
-                    {log.key && <div style={{ color: '#ffb74d' }}>key: {log.key}</div>}
+
+        {/* Progress */}
+        {currentLevel && (
+          <div style={{ padding: '15px', borderBottom: '1px solid #333' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+              <span style={{ color: '#4CAF50', fontWeight: 'bold' }}>{getLevelDisplayName(currentLevel)}</span>
+              <span style={{ color: '#666' }}>{progress.current}/{progress.total}</span>
+            </div>
+            <div style={{ height: 4, background: '#333', borderRadius: 2, overflow: 'hidden' }}>
+              <div style={{ 
+                width: `${(progress.current / progress.total) * 100}%`, 
+                height: '100%', 
+                background: '#4CAF50',
+                transition: 'width 0.3s ease'
+              }} />
+            </div>
+          </div>
+        )}
+
+        {/* Event Log */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          <div style={{ padding: '10px 15px', background: '#222', color: '#888', fontSize: '11px', borderBottom: '1px solid #333' }}>
+            EVENT LOG ({logs.length})
+          </div>
+          <div style={{ 
+            flex: 1, 
+            padding: '10px', 
+            overflowY: 'auto', 
+            fontFamily: 'monospace', 
+            fontSize: '11px',
+            pointerEvents: 'auto' // Allow scrolling log
+          }}>
+            {logs.length === 0 && <div style={{ color: '#444' }}>No events recorded...</div>}
+            {logs.slice(-50).map((log, i) => (
+              <div key={i} style={{ 
+                marginBottom: 8, 
+                padding: '6px 8px',
+                background: '#222',
+                borderRadius: 4,
+                borderLeft: `3px solid ${
+                  log.type === 'level_complete' ? '#4CAF50' :
+                  log.type === 'click' ? '#2196F3' :
+                  log.type === 'input' ? '#FF9800' :
+                  log.type === 'keydown' ? '#9C27B0' :
+                  '#666'
+                }`
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#888', marginBottom: 4 }}>
+                  <span style={{ textTransform: 'uppercase', fontWeight: 'bold' }}>{log.type}</span>
+                  <span>+{log.relativeTime}ms</span>
                 </div>
+                {log.targetTag && (
+                  <div style={{ color: '#aaa' }}>
+                    &lt;{log.targetTag.toLowerCase()}
+                    {log.targetId && <span style={{ color: '#4fc3f7' }}> #{log.targetId}</span>}
+                    {log.targetName && <span style={{ color: '#81c784' }}> name="{log.targetName}"</span>}
+                    &gt;
+                  </div>
+                )}
+                {log.value !== undefined && log.value !== '' && (
+                  <div style={{ color: '#ffb74d', wordBreak: 'break-all' }}>
+                    value: "{log.value.substring(0, 50)}{log.value.length > 50 ? '...' : ''}"
+                  </div>
+                )}
+                {log.key && <div style={{ color: '#ce93d8' }}>key: {log.key}</div>}
+                {log.innerText && log.type === 'click' && (
+                  <div style={{ color: '#90caf9', fontSize: '10px' }}>
+                    text: "{log.innerText.substring(0, 30)}..."
+                  </div>
+                )}
+              </div>
             ))}
+          </div>
         </div>
-        <div style={{ padding: 10, borderTop: '1px solid #333', fontSize: '12px' }}>
-            Status: {isRunning ? <span style={{ color: '#4CAF50' }}>RECORDING</span> : <span style={{ color: '#F44336' }}>IDLE</span>} | Events: {logs.length}
+
+        {/* Footer */}
+        <div style={{ padding: '10px 15px', borderTop: '1px solid #333', fontSize: '11px', color: '#666' }}>
+          <div>Status: {isRunning ? <span style={{ color: '#4CAF50' }}>RECORDING</span> : <span style={{ color: '#666' }}>IDLE</span>}</div>
+          <div style={{ marginTop: 5 }}>
+            <button 
+              onClick={(e) => { e.stopPropagation(); downloadReport(); }}
+              disabled={logs.length === 0}
+              style={{ 
+                background: logs.length > 0 ? '#2196F3' : '#333', 
+                color: logs.length > 0 ? 'white' : '#666', 
+                border: 'none', 
+                padding: '6px 12px', 
+                borderRadius: 4, 
+                cursor: logs.length > 0 ? 'pointer' : 'not-allowed',
+                fontSize: '11px',
+                pointerEvents: 'auto'
+              }}
+            >
+              Download Report
+            </button>
+          </div>
         </div>
       </div>
 
@@ -207,7 +279,7 @@ export const Gauntlet = ({ children }) => {
         }
         @keyframes pulse {
           0%, 100% { opacity: 1; }
-          50% { opacity: 0.7; }
+          50% { opacity: 0.5; }
         }
       `}</style>
     </div>
