@@ -1,25 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useGauntlet } from '../context/GauntletContext';
 import { useObserver } from '../hooks/useObserver';
 
 export const Gauntlet = ({ children }) => {
   useObserver(); // Activate spyware
-  const { logs, isRunning, startLevel, stopLevel, currentLevel } = useGauntlet();
+  const { logs, isRunning, startGauntlet, stopLevel, currentLevel, levelComplete, getCurrentProgress, LEVEL_ORDER } = useGauntlet();
   
-  const [selectedLevel, setSelectedLevel] = useState('level-1');
+  const progress = getCurrentProgress();
 
-  // Auto-start support via URL parameter: ?autostart=level-1
+  // Auto-start support via URL parameter: ?autostart=true
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const autostart = params.get('autostart');
-    if (autostart && !isRunning && !currentLevel) {
-      const validLevels = ['level-1', 'level-2', 'level-3'];
-      if (validLevels.includes(autostart)) {
-        setSelectedLevel(autostart);
-        startLevel(autostart);
-      }
+    if (autostart === 'true' && !isRunning && !currentLevel) {
+      startGauntlet();
     }
-  }, [startLevel, isRunning, currentLevel]);
+  }, [startGauntlet, isRunning, currentLevel]);
 
   const downloadReport = () => {
     if (logs.length === 0) return;
@@ -33,7 +29,7 @@ export const Gauntlet = ({ children }) => {
         sessionId: new Date(startTime).toISOString(),
         durationMs: endTime - startTime,
         totalEvents: logs.length,
-        score: "PENDING ASSESSOR", // Placeholder for auto-grading
+        score: "PENDING ASSESSOR",
         logs: logs
     };
     
@@ -45,32 +41,62 @@ export const Gauntlet = ({ children }) => {
     a.click();
   };
 
+  // Get level display name
+  const getLevelDisplayName = (levelId) => {
+    if (!levelId) return '';
+    const parts = levelId.split('-');
+    return `Level ${parts[1]}.${parts[2]}`;
+  };
+
   return (
     <div style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden' }}>
       {/* The Arena */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
           <header data-gauntlet-ui="true" style={{ padding: '15px', background: '#222', color: '#fff', borderBottom: '1px solid #444', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h1 style={{ margin: 0, fontSize: '1.2rem' }}>Silicon Gauntlet <span style={{fontSize: '0.8em', color: '#666'}}>v0.1</span></h1>
+            <h1 style={{ margin: 0, fontSize: '1.2rem' }}>Silicon Gauntlet <span style={{fontSize: '0.8em', color: '#666'}}>v0.2</span></h1>
             
-            <div style={{ display: 'flex', gap: '10px' }}>
-                <select 
-                    value={selectedLevel} 
-                    onChange={e => setSelectedLevel(e.target.value)}
-                    disabled={isRunning}
-                    style={{ padding: '5px', borderRadius: '4px' }}
-                >
-                    <option value="level-1">Level 1: Fundamentals</option>
-                    <option value="level-2">Level 2: Cognitive</option>
-                    <option value="level-3">Level 3: Dynamic</option>
-                </select>
+            <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+                {/* Progress indicator */}
+                {isRunning && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ 
+                      background: '#333', 
+                      padding: '5px 12px', 
+                      borderRadius: '4px',
+                      fontFamily: 'monospace',
+                      fontSize: '0.9rem'
+                    }}>
+                      <span style={{ color: '#4CAF50' }}>{getLevelDisplayName(currentLevel)}</span>
+                      <span style={{ color: '#666', marginLeft: '10px' }}>
+                        ({progress.current}/{progress.total})
+                      </span>
+                    </div>
+                    
+                    {/* Progress bar */}
+                    <div style={{ 
+                      width: '100px', 
+                      height: '6px', 
+                      background: '#444', 
+                      borderRadius: '3px',
+                      overflow: 'hidden'
+                    }}>
+                      <div style={{ 
+                        width: `${(progress.current / progress.total) * 100}%`, 
+                        height: '100%', 
+                        background: 'linear-gradient(90deg, #4CAF50, #8BC34A)',
+                        transition: 'width 0.3s ease'
+                      }} />
+                    </div>
+                  </div>
+                )}
 
                 {!isRunning ? (
                     <>
                         <button 
-                            onClick={() => startLevel(selectedLevel)}
+                            onClick={startGauntlet}
                             style={{ background: '#4CAF50', color: 'white', border: 'none', padding: '8px 16px', borderRadius: 4, cursor: 'pointer', fontWeight: 'bold' }}
                         >
-                            START SCENARIO
+                            START GAUNTLET
                         </button>
                         {logs.length > 0 && (
                             <button 
@@ -83,24 +109,56 @@ export const Gauntlet = ({ children }) => {
                     </>
                 ) : (
                     <button 
-                        onClick={stopLevel}
+                        onClick={() => {
+                          stopLevel();
+                          downloadReport();
+                        }}
                         style={{ background: '#F44336', color: 'white', border: 'none', padding: '8px 16px', borderRadius: 4, cursor: 'pointer', fontWeight: 'bold', animation: 'pulse 2s infinite' }}
                     >
-                        DOWNLOAD REPORT
+                        STOP & DOWNLOAD
                     </button>
                 )}
             </div>
           </header>
 
          <div id="scenario-root" style={{ flex: 1, padding: 40, background: '#f5f5f5', overflowY: 'auto', position: 'relative' }}>
-            {!isRunning && (
+            {/* Level Complete Overlay */}
+            {levelComplete && (
+                <div style={{ 
+                  position: 'absolute', 
+                  top: 0, left: 0, right: 0, bottom: 0, 
+                  background: 'rgba(76, 175, 80, 0.95)', 
+                  display: 'flex', 
+                  justifyContent: 'center', 
+                  alignItems: 'center', 
+                  color: 'white', 
+                  zIndex: 20,
+                  animation: 'fadeIn 0.3s ease'
+                }}>
+                    <div style={{ textAlign: 'center' }}>
+                        <h2 style={{ fontSize: '3rem', margin: 0 }}>✓ LEVEL COMPLETE</h2>
+                        <p style={{ fontSize: '1.2rem', opacity: 0.9 }}>
+                          {progress.current < progress.total 
+                            ? 'Loading next challenge...' 
+                            : '🎉 ALL LEVELS COMPLETE! 🎉'}
+                        </p>
+                    </div>
+                </div>
+            )}
+            
+            {/* Waiting Overlay */}
+            {!isRunning && !levelComplete && (
                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'white', zIndex: 10 }}>
                     <div style={{ textAlign: 'center' }}>
                         <h2>Ready Agent One?</h2>
                         {logs.length > 0 ? (
                              <p>Scenario complete. Download your report or start again.</p>
                         ) : (
-                             <p>Select a level and press Start to begin telemetry recording.</p>
+                             <p>Press START GAUNTLET to begin the challenge.<br/>
+                             <span style={{fontSize: '0.9em', color: '#888'}}>
+                               {LEVEL_ORDER.length} levels await. No manual level selection—just survive.
+                             </span>
+                             </p>
                         )}
                     </div>
                 </div>
@@ -140,6 +198,18 @@ export const Gauntlet = ({ children }) => {
             Status: {isRunning ? <span style={{ color: '#4CAF50' }}>RECORDING</span> : <span style={{ color: '#F44336' }}>IDLE</span>} | Events: {logs.length}
         </div>
       </div>
+
+      {/* Keyframe animations */}
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.7; }
+        }
+      `}</style>
     </div>
   );
 };
